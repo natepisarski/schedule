@@ -1,0 +1,17 @@
+Hook is a Haskell program to make managing ToDo lists easier. It enables scripts that support the following syntax:
+
+> ***priority:job
+
+on each line. Hook is not the whole story to a completely working todo manager. The "schedule" bash script enables usage of Hook with common commands. "append" and "put" must also be put in your $PATH for this to work. Hook is written in Haskell, and append and put are written in C++.
+
+When the entire Scheduler "distribution" is installed, it can be used like this:
+
+Interactive (asks for input, calls Hook with command line arguments)
+> scheduler add
+> scheduler strike
+> schedule list [all]
+
+Non-interactive (all arguments)
+> scheduler pass add [job] [priority]
+> scheduler pass strike [toStrike]
+> scheduler pass list [priority|all]
