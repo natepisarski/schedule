@@ -1,53 +1,56 @@
-import Cookbook.Ingredients.Lists.Modify
-import Cookbook.Ingredients.Lists.Access
-import Cookbook.Ingredients.Tupples.Look
-import Cookbook.Recipes.Sanitize
-import Cookbook.Continuous
-import Cookbook.IO
+import Cookbook.Essential.IO
+import Cookbook.Essential.Common
+import Cookbook.Project.Quill.Quill
 
-import System.IO
+import qualified System.IO        as LIO
+import qualified System.IO.Strict as SIO
+
 import System.Environment
-import System.Process
 
-import Data.Maybe
---General form of an entry:
--- ***level:job
+gfilename = ".schedule"
 
-isMission :: String -> Bool
-isMission x = and [(':' `elem` x),(x `contains` "***")]
+main = do  
+  file   <- inhome gfilename LIO.ReadMode
+  flines <- fmap lines $ SIO.hGetContents file
+  args   <- getArgs
 
-getDifficulty :: String -> String
-getDifficulty x = before (after (rm (before x ':') ' ') "***") ':'
+  case args of
+    (command:name:diff:desc:[]) -> writeNew name diff desc
+    (command:arg:[])            -> if (command == "read") then readSch arg flines else writeSch arg flines
+    (list:_)                    -> listSch flines
 
-getJob :: String -> String
-getJob = (flip after) ':'
+readSch :: String -> [String] -> IO ()
+readSch arg schLines =
+  do
+    let allTables   = tables schLines
+    let appropTable = getTable allTables arg
+    mapM_ prettyPrint appropTable
 
-main = do
-  (file:command:argument:_) <- getArgs
-  allLines <- filelines file
+writeSch :: String -> [String] -> IO ()
+writeSch arg schLines =
+  do
+    name        <- prompt "Name: "
+    difficulty  <- prompt "Difficulty: "
+    description <- prompt "Description: "
 
-  let parsed = catMaybes $ map (\c -> if isMission c then (Just ((getDifficulty c),(getJob c))) else Nothing) allLines
-               
-  case command of "add" -> appendFile file argument;"strike" -> strike file argument;"list" -> list parsed argument
+    writeNew name difficulty description
 
--- | Strike the line containing the argument from the file.
-strike :: String -> String -> IO ()
-strike file arg = do
-  a <- filelines file
-  system $  "put " ++ file ++ " " ++ (flt [surround d ('"','"')++" " | d <- a, (not (d `contains` arg))])
-  return ()
+listSch :: [String] -> IO ()
+listSch files =
+  do
+    let allTables = tables files
+    mapM_ putStrLn $ map fst allTables
 
-list :: [(String,String)] -> String -> IO ()
-list [] _ = return ()
-list ((a,b):c) "all" = do putStrLn $ "Job: " ++ b ++ ", Difficulty:: " ++ a;
-                                 list c "all"
-list parsed arg = mapM_ diffSpeak $ (filter (\(diff,jb) -> or [diff `contains` arg, jb `contains` arg]) parsed)
+writeNew :: String -> String -> String -> IO ()
+writeNew name difficulty description =
+  do
+    flines <- (inhome gfilename) LIO.ReadMode >>= SIO.hGetContents
+    
+    let tblAddedNm = createTable (tables (lines flines)) name
+    let tblAddedDs = addItem tblAddedNm name ("difficulty" ,difficulty)
+    let tblAddedDc = addItem tblAddedDs name ("description",description)
+--Could be done in a map, but why? It's only 3 lets.        
+    writeFile gfilename $ flt $ map tableToString tblAddedDc
 
-surround :: [a] -> (a,a) -> [a]
-surround a (b,c) = b:a ++ [c]
-
-flt :: [[a]] -> [a]
-flt [] = []
-flt (x:xs) = x ++ flt xs
-
-diffSpeak (a,b) = putStrLn ("Job: " ++ b ++ ", Difficulty: " ++ a)
+prettyPrint :: (String,String) -> IO ()
+prettyPrint (a,b) = putStrLn (a ++ " : " ++ b)
